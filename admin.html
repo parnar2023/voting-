@@ -1,86 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Admin Results</title>
+    <title>Admin Panel</title>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
-            authDomain: "website-f6d0f.firebaseapp.com",
-            databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "website-f6d0f",
-            storageBucket: "website-f6d0f.appspot.com",
-            messagingSenderId: "800099865387",
-            appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
-            measurementId: "G-G8HTF5580X"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-
-        const ADMIN_PASSWORD = "1234"; // change this
-
-        window.login = function() {
-            const input = document.getElementById("password").value;
-
-            if (input !== ADMIN_PASSWORD) {
-                alert("Wrong password");
-                return;
-            }
-
-            loadResults();
-        }
-
-        function loadResults() {
-            const votesRef = ref(db, "votes");
-
-            get(votesRef).then(snapshot => {
-                const data = snapshot.val() || {};
-
-                const max = data.Max || 0;
-                const ben = data.Ben || 0;
-                const dom = data.Dom || 0;
-
-                let winner = "Tie";
-                if (max > ben && max > dom) winner = "Max";
-                if (ben > max && ben > dom) winner = "Ben";
-                if (dom > max && dom > ben) winner = "Dom";
-
-                document.getElementById("results").innerHTML = `
-                    <h2>Results</h2>
-                    Max: ${max}<br>
-                    Ben: ${ben}<br>
-                    Dom: ${dom}<br><br>
-                    <strong>Winner: ${winner}</strong><br><br>
-                    <button onclick="resetVotes()">Reset Votes</button>
-                `;
-            });
-        }
-
-        window.resetVotes = function() {
-            if (!confirm("Are you sure you want to reset ALL votes?")) return;
-
-            const votesRef = ref(db, "votes");
-
-            set(votesRef, {
-                Max: 0,
-                Ben: 0,
-                Dom: 0
-            }).then(() => {
-                alert("Votes reset!");
-                loadResults();
-            });
-        }
-    </script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        body { font-family: Arial; text-align: center; padding-top: 50px; }
+        body { font-family: Arial; text-align: center; padding-top: 40px; }
         input { padding: 10px; font-size: 18px; }
-        button { padding: 10px 20px; font-size: 18px; margin-top: 10px; cursor: pointer; }
-        #results { margin-top: 30px; font-size: 22px; }
+        button { padding: 10px 20px; font-size: 18px; margin: 10px; cursor: pointer; }
+        #results { margin-top: 30px; font-size: 22px; display: none; }
+        canvas { margin-top: 30px; display: none; }
     </style>
 </head>
 <body>
@@ -90,9 +21,146 @@
 <input id="password" type="password" placeholder="Enter admin password">
 <button onclick="login()">Login</button>
 
+<div id="controls" style="display:none;">
+    <button onclick="reveal()">Reveal Results</button>
+    <button onclick="hideResults()">Hide Results</button>
+    <button onclick="resetVotes()">Reset Votes</button>
+</div>
+
 <div id="results"></div>
+
+<canvas id="barChart" width="400" height="200"></canvas>
+<canvas id="pieChart" width="400" height="200"></canvas>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
+        authDomain: "website-f6d0f.firebaseapp.com",
+        databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "website-f6d0f",
+        storageBucket: "website-f6d0f.appspot.com",
+        messagingSenderId: "800099865387",
+        appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
+        measurementId: "G-G8HTF5580X"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const ADMIN_PASSWORD = "1234"; // change this
+
+    let barChart = null;
+    let pieChart = null;
+    let cachedResults = null;
+
+    window.login = function() {
+        const input = document.getElementById("password").value;
+
+        if (input !== ADMIN_PASSWORD) {
+            alert("Wrong password");
+            return;
+        }
+
+        document.getElementById("controls").style.display = "block";
+        loadResults();
+    }
+
+    function loadResults() {
+        const votesRef = ref(db, "votes");
+
+        get(votesRef).then(snapshot => {
+            const data = snapshot.val() || {};
+
+            cachedResults = {
+                max: data.Max || 0,
+                ben: data.Ben || 0,
+                dom: data.Dom || 0
+            };
+        });
+    }
+
+    window.reveal = function() {
+        if (!cachedResults) return;
+
+        const { max, ben, dom } = cachedResults;
+
+        let winner = "Tie";
+        if (max > ben && max > dom) winner = "Max";
+        if (ben > max && ben > dom) winner = "Ben";
+        if (dom > max && dom > ben) winner = "Dom";
+
+        document.getElementById("results").innerHTML = `
+            <h2>Results</h2>
+            Max: ${max}<br>
+            Ben: ${ben}<br>
+            Dom: ${dom}<br><br>
+            <strong>Winner: ${winner}</strong>
+        `;
+
+        document.getElementById("results").style.display = "block";
+        document.getElementById("barChart").style.display = "block";
+        document.getElementById("pieChart").style.display = "block";
+
+        drawCharts(max, ben, dom);
+    }
+
+    window.hideResults = function() {
+        document.getElementById("results").style.display = "none";
+        document.getElementById("barChart").style.display = "none";
+        document.getElementById("pieChart").style.display = "none";
+    }
+
+    function drawCharts(max, ben, dom) {
+        const barCtx = document.getElementById("barChart").getContext("2d");
+        const pieCtx = document.getElementById("pieChart").getContext("2d");
+
+        if (barChart) barChart.destroy();
+        if (pieChart) pieChart.destroy();
+
+        barChart = new Chart(barCtx, {
+            type: "bar",
+            data: {
+                labels: ["Max", "Ben", "Dom"],
+                datasets: [{
+                    label: "Votes",
+                    data: [max, ben, dom],
+                    backgroundColor: ["#4285F4", "#DB4437", "#F4B400"]
+                }]
+            },
+            options: { scales: { y: { beginAtZero: true } } }
+        });
+
+        pieChart = new Chart(pieCtx, {
+            type: "pie",
+            data: {
+                labels: ["Max", "Ben", "Dom"],
+                datasets: [{
+                    data: [max, ben, dom],
+                    backgroundColor: ["#4285F4", "#DB4437", "#F4B400"]
+                }]
+            }
+        });
+    }
+
+    window.resetVotes = function() {
+        if (!confirm("Are you sure you want to reset ALL votes?")) return;
+
+        const votesRef = ref(db, "votes");
+
+        set(votesRef, { Max: 0, Ben: 0, Dom: 0 }).then(() => {
+            alert("Votes reset!");
+
+            localStorage.removeItem("voted");
+
+            loadResults();
+            hideResults();
+        });
+    }
+</script>
 
 </body>
 </html>
-
 
