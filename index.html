@@ -2,8 +2,40 @@
 <html>
 <head>
     <title>Vote</title>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getDatabase, ref, runTransaction } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
+            authDomain: "website-f6d0f.firebaseapp.com",
+            databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "website-f6d0f",
+            storageBucket: "website-f6d0f.appspot.com",
+            messagingSenderId: "800099865387",
+            appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
+            measurementId: "G-G8HTF5580X"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        window.vote = function(name) {
+            if (localStorage.getItem("voted") === "yes") {
+                alert("You already voted");
+                return;
+            }
+
+            const voteRef = ref(db, "votes/" + name);
+
+            runTransaction(voteRef, (count) => {
+                return (count || 0) + 1;
+            });
+
+            localStorage.setItem("voted", "yes");
+            document.getElementById("message").innerText = "Your vote has been recorded!";
+        }
+    </script>
 
     <style>
         body { font-family: Arial; text-align: center; padding-top: 50px; }
@@ -22,29 +54,6 @@
 
 <p id="message"></p>
 
-<script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
-        authDomain: "website-f6d0f.firebaseapp.com",
-        databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "website-f6d0f",
-        storageBucket: "website-f6d0f.appspot.com",
-        messagingSenderId: "800099865387",
-        appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
-        measurementId: "G-G8HTF5580X"
-    };
-
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    function vote(name) {
-        db.ref("votes/" + name).transaction(count => {
-            return (count || 0) + 1;
-        });
-
-        document.getElementById("message").innerText = "Your vote has been recorded!";
-    }
-</script>
-
 </body>
 </html>
+
