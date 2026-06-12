@@ -2,6 +2,13 @@
 <html>
 <head>
     <title>Vote</title>
+
+    <style>
+        body { font-family: Arial; text-align: center; padding-top: 50px; }
+        button { padding: 15px 30px; margin: 10px; font-size: 20px; cursor: pointer; }
+        #message { margin-top: 20px; font-size: 18px; }
+    </style>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, runTransaction } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
@@ -36,12 +43,6 @@
             document.getElementById("message").innerText = "Your vote has been recorded!";
         }
     </script>
-
-    <style>
-        body { font-family: Arial; text-align: center; padding-top: 50px; }
-        button { padding: 15px 30px; margin: 10px; font-size: 20px; cursor: pointer; }
-        #message { margin-top: 20px; font-size: 18px; }
-    </style>
 </head>
 <body>
 
@@ -56,4 +57,5 @@
 
 </body>
 </html>
+
 
