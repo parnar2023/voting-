@@ -5,7 +5,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
@@ -31,6 +31,10 @@
                 return;
             }
 
+            loadResults();
+        }
+
+        function loadResults() {
             const votesRef = ref(db, "votes");
 
             get(votesRef).then(snapshot => {
@@ -50,8 +54,24 @@
                     Max: ${max}<br>
                     Ben: ${ben}<br>
                     Dom: ${dom}<br><br>
-                    <strong>Winner: ${winner}</strong>
+                    <strong>Winner: ${winner}</strong><br><br>
+                    <button onclick="resetVotes()">Reset Votes</button>
                 `;
+            });
+        }
+
+        window.resetVotes = function() {
+            if (!confirm("Are you sure you want to reset ALL votes?")) return;
+
+            const votesRef = ref(db, "votes");
+
+            set(votesRef, {
+                Max: 0,
+                Ben: 0,
+                Dom: 0
+            }).then(() => {
+                alert("Votes reset!");
+                loadResults();
             });
         }
     </script>
@@ -59,7 +79,7 @@
     <style>
         body { font-family: Arial; text-align: center; padding-top: 50px; }
         input { padding: 10px; font-size: 18px; }
-        button { padding: 10px 20px; font-size: 18px; margin-top: 10px; }
+        button { padding: 10px 20px; font-size: 18px; margin-top: 10px; cursor: pointer; }
         #results { margin-top: 30px; font-size: 22px; }
     </style>
 </head>
@@ -74,4 +94,5 @@
 
 </body>
 </html>
+
 
