@@ -2,8 +2,59 @@
 <html>
 <head>
     <title>Admin Results</title>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
+            authDomain: "website-f6d0f.firebaseapp.com",
+            databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "website-f6d0f",
+            storageBucket: "website-f6d0f.appspot.com",
+            messagingSenderId: "800099865387",
+            appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
+            measurementId: "G-G8HTF5580X"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const ADMIN_PASSWORD = "1234"; // change this
+
+        window.login = function() {
+            const input = document.getElementById("password").value;
+
+            if (input !== ADMIN_PASSWORD) {
+                alert("Wrong password");
+                return;
+            }
+
+            const votesRef = ref(db, "votes");
+
+            get(votesRef).then(snapshot => {
+                const data = snapshot.val() || {};
+
+                const max = data.Max || 0;
+                const ben = data.Ben || 0;
+                const dom = data.Dom || 0;
+
+                let winner = "Tie";
+                if (max > ben && max > dom) winner = "Max";
+                if (ben > max && ben > dom) winner = "Ben";
+                if (dom > max && dom > ben) winner = "Dom";
+
+                document.getElementById("results").innerHTML = `
+                    <h2>Results</h2>
+                    Max: ${max}<br>
+                    Ben: ${ben}<br>
+                    Dom: ${dom}<br><br>
+                    <strong>Winner: ${winner}</strong>
+                `;
+            });
+        }
+    </script>
 
     <style>
         body { font-family: Arial; text-align: center; padding-top: 50px; }
@@ -21,53 +72,6 @@
 
 <div id="results"></div>
 
-<script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
-        authDomain: "website-f6d0f.firebaseapp.com",
-        databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "website-f6d0f",
-        storageBucket: "website-f6d0f.appspot.com",
-        messagingSenderId: "800099865387",
-        appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
-        measurementId: "G-G8HTF5580X"
-    };
-
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
-    const ADMIN_PASSWORD = "fuckoff"; // CHANGE THIS
-
-    function login() {
-        const input = document.getElementById("password").value;
-
-        if (input !== ADMIN_PASSWORD) {
-            alert("Wrong password");
-            return;
-        }
-
-        db.ref("votes").once("value", snapshot => {
-            const data = snapshot.val() || {};
-
-            const max = data.Max || 0;
-            const ben = data.Ben || 0;
-            const dom = data.Dom || 0;
-
-            let winner = "Tie";
-            if (max > ben && max > dom) winner = "Max";
-            if (ben > max && ben > dom) winner = "Ben";
-            if (dom > max && dom > ben) winner = "Dom";
-
-            document.getElementById("results").innerHTML = `
-                <h2>Results</h2>
-                Max: ${max}<br>
-                Ben: ${ben}<br>
-                Dom: ${dom}<br><br>
-                <strong>Winner: ${winner}</strong>
-            `;
-        });
-    }
-</script>
-
 </body>
 </html>
+
