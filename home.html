@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Home</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #E5FCC2;
+      color: #594F4F;
+      padding: 20px;
+    }
+    h1, h2 { text-align: center; }
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #547980;
+      color: #E5FCC2;
+      padding: 10px 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .btn {
+      padding: 6px 12px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      background: #45ADA8;
+      color: #594F4F;
+      font-weight: bold;
+    }
+    .btn:hover { background: #9DE0AD; }
+    .section {
+      background: #F7FFF0;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px solid #9DE0AD;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    textarea, input {
+      width: 100%;
+      max-width: 600px;
+      padding: 6px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #9DE0AD;
+    }
+    #announcements, #chatMessages {
+      border: 1px solid #9DE0AD;
+      padding: 10px;
+      border-radius: 5px;
+      max-height: 250px;
+      overflow-y: auto;
+      background: #FFFFFF;
+    }
+    small { color: #547980; }
+  </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getDatabase, ref, onValue, push, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
+      authDomain: "website-f6d0f.firebaseapp.com",
+      databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "website-f6d0f",
+      storageBucket: "website-f6d0f.appspot.com",
+      messagingSenderId: "800099865387",
+      appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
+      measurementId: "G-G8HTF5580X"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const userCode = localStorage.getItem("userCode");
+    const userName = localStorage.getItem("userName");
+    const isAdmin = localStorage.getItem("isAdmin") === "true";
+
+    if (!userCode) {
+      window.location.href = "index.html";
+    }
+
+    window.addEventListener("load", () => {
+      document.getElementById("who").innerText = userName || userCode;
+      if (!isAdmin) {
+        document.getElementById("adminAnnouncementForm").style.display = "none";
+      }
+      loadAnnouncements();
+      subscribeChat();
+    });
+
+    // Announcements
+    function loadAnnouncements() {
+      const annRef = ref(db, "announcements");
+      onValue(annRef, snap => {
+        const data = snap.val() || {};
+        let html = "";
+        Object.keys(data).forEach(id => {
+          const a = data[id];
+          html += `<div>
+            <strong>${a.text}</strong><br>
+            <small>By ${a.createdByName || a.createdBy} at ${new Date(a.createdAt).toLocaleString()}</small>
+          </div><hr>`;
+        });
+        document.getElementById("announcements").innerHTML = html || "<em>No announcements yet.</em>";
+      });
+    }
+
+    window.addAnnouncement = function () {
+      const text = document.getElementById("announcementText").value.trim();
+      if (!text) return;
+      const annRef = ref(db, "announcements");
+      const newRef = push(annRef);
+      set(newRef, {
+        text,
+        createdBy: userCode,
+        createdByName: userName || "",
+        createdAt: Date.now()
+      }).then(() => {
+        document.getElementById("announcementText").value = "";
+      });
+    }
+
+    // Chat
+    function subscribeChat() {
+      const chatRef = ref(db, "chat");
+      onValue(chatRef, snap => {
+        const data = snap.val() || {};
+        let html = "";
+        Object.keys(data).forEach(id => {
+          const m = data[id];
+          html += `<div>
+            <strong>${m.userName || m.userCode}:</strong> ${m.text}
+            <br><small>${new Date(m.timestamp).toLocaleString()}</small>
+          </div><hr>`;
+        });
+        document.getElementById("chatMessages").innerHTML = html || "<em>No messages yet.</em>";
+      });
+    }
+
+    window.sendMessage = function () {
+      const text = document.getElementById("chatInput").value.trim();
+      if (!text) return;
+      const chatRef = ref(db, "chat");
+      const newRef = push(chatRef);
+      set(newRef, {
+        text,
+        userCode,
+        userName: userName || "",
+        timestamp: Date.now()
+      }).then(() => {
+        document.getElementById("chatInput").value = "";
+      });
+    }
+
+    window.goToVoting = function () {
+      window.location.href = "voting.html";
+    }
+
+    window.logout = function () {
+      localStorage.clear();
+      window.location.href = "index.html";
+    }
+  </script>
+</head>
+<body>
+
+  <div class="top-bar">
+    <div>Logged in as: <strong id="who"></strong></div>
+    <div>
+      <button class="btn" onclick="goToVoting()">Go to Voting</button>
+      <button class="btn" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Announcements</h2>
+    <div id="announcements"></div>
+
+    <div id="adminAnnouncementForm">
+      <h3>Add announcement (admin only)</h3>
+      <textarea id="announcementText" placeholder="Announcement text"></textarea><br>
+      <button class="btn" onclick="addAnnouncement()">Add Announcement</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Chat</h2>
+    <div id="chatMessages"></div>
+    <textarea id="chatInput" placeholder="Type a message"></textarea><br>
+    <button class="btn" onclick="sendMessage()">Send</button>
+  </div>
+
+</body>
+</html>
