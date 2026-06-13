@@ -1,154 +1,110 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Admin</title>
-  <style>
-    body { font-family:Arial; background:#E5FCC2; color:#594F4F; padding:20px; }
-    .top-bar { display:flex; justify-content:space-between; align-items:center; background:#547980; color:#E5FCC2; padding:10px 15px; border-radius:8px; margin-bottom:20px; }
-    .btn { padding:6px 12px; border-radius:5px; border:none; cursor:pointer; background:#45ADA8; color:#594F4F; font-weight:bold; margin:2px; }
-    .btn:hover { background:#9DE0AD; }
-    .section { background:#F7FFF0; border-radius:8px; padding:15px; margin-bottom:20px; border:1px solid #9DE0AD; max-width:1000px; margin:0 auto 20px auto; }
-    table { border-collapse:collapse; width:100%; margin-top:10px; background:#FFFFFF; color:#594F4F; }
-    th,td { border:1px solid #9DE0AD; padding:6px; text-align:left; }
-    input,select { padding:4px; margin:2px; border-radius:4px; border:1px solid #9DE0AD; }
-  </style>
-</head>
-<body>
-  <div class="top-bar">
-    <div><strong>Admin Panel</strong></div>
-    <div>
-      <button class="btn" onclick="goHome()">Home</button>
-    </div>
-  </div>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+  import { getDatabase, ref, get, set, update, remove, push } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
-  <div class="section">
-    <h2>Users</h2>
-    <div id="userList"></div>
-  </div>
+  const firebaseConfig = {
+    apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
+    authDomain: "website-f6d0f.firebaseapp.com",
+    databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "website-f6d0f",
+    storageBucket: "website-f6d0f.appspot.com",
+    messagingSenderId: "800099865387",
+    appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
+    measurementId: "G-G8HTF5580X"
+  };
 
-  <div class="section">
-    <h2>Candidates</h2>
-    <input id="newCandidateName" placeholder="Candidate name">
-    <button class="btn" onclick="addCandidate()">Add</button>
-    <div id="candidateList"></div>
-  </div>
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
 
-  <div class="section">
-    <h2>Voting Control</h2>
-    <button class="btn" onclick="setVoting(true)">Open Voting</button>
-    <button class="btn" onclick="setVoting(false)">Close Voting</button>
-    <button class="btn" onclick="setReveal(true)">Reveal Results</button>
-    <button class="btn" onclick="setReveal(false)">Hide Results</button>
-  </div>
+  // ⭐ ADMIN LOGIN DISABLED ⭐
+  // No redirect, no login check, admin page always loads
+  console.warn("Admin login bypass active — page accessible without login.");
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, get, set, update, remove, push } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
-      authDomain: "website-f6d0f.firebaseapp.com",
-      databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "website-f6d0f",
-      storageBucket: "website-f6d0f.appspot.com",
-      messagingSenderId: "800099865387",
-      appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
-      measurementId: "G-G8HTF5580X"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    const isAdmin = localStorage.getItem("isAdmin") === "true";
-    if (!isAdmin) window.location.href = "index.html";
-
-    async function loadUsers() {
-      const snap = await get(ref(db, "users"));
-      const data = snap.val() || {};
-      let html = "<table><tr><th>Name</th><th>Code</th><th>Job</th><th>Daily Pay</th><th>Money</th><th>Admin</th><th>Actions</th></tr>";
-      Object.keys(data).forEach(code => {
-        const u = data[code];
-        html += `<tr>
-          <td>${u.name || ""}</td>
-          <td>${code}</td>
-          <td><input value="${u.job || ""}" onchange="updateUserField('${code}','job',this.value)"></td>
-          <td><input type="number" value="${u.dailyPay || 0}" onchange="updateUserField('${code}','dailyPay',Number(this.value))"></td>
-          <td><input type="number" value="${u.money || 0}" onchange="updateUserField('${code}','money',Number(this.value))"></td>
-          <td><input type="checkbox" ${u.isAdmin ? "checked" : ""} onchange="updateUserField('${code}','isAdmin',this.checked)"></td>
-          <td><button class="btn" onclick="deleteUser('${code}')">Delete</button></td>
-        </tr>`;
-      });
-      html += "</table>";
-      document.getElementById("userList").innerHTML = html;
-    }
-
-    window.updateUserField = async function (code, field, value) {
-      await update(ref(db, "users/" + code), { [field]: value });
-      loadUsers();
-    };
-
-    window.deleteUser = async function (code) {
-      if (!confirm("Delete user " + code + "?")) return;
-      await remove(ref(db, "users/" + code));
-      loadUsers();
-    };
-
-    async function loadCandidates() {
-      const snap = await get(ref(db, "candidates"));
-      const data = snap.val() || {};
-      let html = "<table><tr><th>Name</th><th>Actions</th></tr>";
-      Object.keys(data).forEach(id => {
-        const c = data[id];
-        html += `<tr><td>${c.name}</td><td><button class="btn" onclick="deleteCandidate('${id}')">Delete</button></td></tr>`;
-      });
-      html += "</table>";
-      document.getElementById("candidateList").innerHTML = html;
-    }
-
-    window.addCandidate = async function () {
-      const name = document.getElementById("newCandidateName").value.trim();
-      if (!name) return;
-      const newRef = push(ref(db, "candidates"));
-      await set(newRef, { name });
-      document.getElementById("newCandidateName").value = "";
-      loadCandidates();
-    };
-
-    window.deleteCandidate = async function (id) {
-      await remove(ref(db, "candidates/" + id));
-      loadCandidates();
-    };
-
-    window.setVoting = async function (open) {
-      const snap = await get(ref(db, "votes"));
-      const data = snap.val() || { open:false, reveal:false, totals:{}, byUser:{} };
-      await set(ref(db, "votes"), {
-        open,
-        reveal: data.reveal,
-        totals: data.totals || {},
-        byUser: data.byUser || {}
-      });
-      alert("Voting " + (open ? "opened" : "closed"));
-    };
-
-    window.setReveal = async function (reveal) {
-      const snap = await get(ref(db, "votes"));
-      const data = snap.val() || { open:false, reveal:false, totals:{}, byUser:{} };
-      await set(ref(db, "votes"), {
-        open: data.open,
-        reveal,
-        totals: data.totals || {},
-        byUser: data.byUser || {}
-      });
-      alert("Results " + (reveal ? "revealed" : "hidden"));
-    };
-
-    window.goHome = () => window.location.href = "home.html";
-
-    window.addEventListener("load", () => {
-      loadUsers();
-      loadCandidates();
+  async function loadUsers() {
+    const snap = await get(ref(db, "users"));
+    const data = snap.val() || {};
+    let html = "<table><tr><th>Name</th><th>Code</th><th>Job</th><th>Daily Pay</th><th>Money</th><th>Admin</th><th>Actions</th></tr>";
+    Object.keys(data).forEach(code => {
+      const u = data[code];
+      html += `<tr>
+        <td>${u.name || ""}</td>
+        <td>${code}</td>
+        <td><input value="${u.job || ""}" onchange="updateUserField('${code}','job',this.value)"></td>
+        <td><input type="number" value="${u.dailyPay || 0}" onchange="updateUserField('${code}','dailyPay',Number(this.value))"></td>
+        <td><input type="number" value="${u.money || 0}" onchange="updateUserField('${code}','money',Number(this.value))"></td>
+        <td><input type="checkbox" ${u.isAdmin ? "checked" : ""} onchange="updateUserField('${code}','isAdmin',this.checked)"></td>
+        <td><button class="btn" onclick="deleteUser('${code}')">Delete</button></td>
+      </tr>`;
     });
-  </script>
-</body>
-</html>
+    html += "</table>";
+    document.getElementById("userList").innerHTML = html;
+  }
+
+  window.updateUserField = async function (code, field, value) {
+    await update(ref(db, "users/" + code), { [field]: value });
+    loadUsers();
+  };
+
+  window.deleteUser = async function (code) {
+    if (!confirm("Delete user " + code + "?")) return;
+    await remove(ref(db, "users/" + code));
+    loadUsers();
+  };
+
+  async function loadCandidates() {
+    const snap = await get(ref(db, "candidates"));
+    const data = snap.val() || {};
+    let html = "<table><tr><th>Name</th><th>Actions</th></tr>";
+    Object.keys(data).forEach(id => {
+      const c = data[id];
+      html += `<tr><td>${c.name}</td><td><button class="btn" onclick="deleteCandidate('${id}')">Delete</button></td></tr>`;
+    });
+    html += "</table>";
+    document.getElementById("candidateList").innerHTML = html;
+  }
+
+  window.addCandidate = async function () {
+    const name = document.getElementById("newCandidateName").value.trim();
+    if (!name) return;
+    const newRef = push(ref(db, "candidates"));
+    await set(newRef, { name });
+    document.getElementById("newCandidateName").value = "";
+    loadCandidates();
+  };
+
+  window.deleteCandidate = async function (id) {
+    await remove(ref(db, "candidates/" + id));
+    loadCandidates();
+  };
+
+  window.setVoting = async function (open) {
+    const snap = await get(ref(db, "votes"));
+    const data = snap.val() || { open:false, reveal:false, totals:{}, byUser:{} };
+    await set(ref(db, "votes"), {
+      open,
+      reveal: data.reveal,
+      totals: data.totals || {},
+      byUser: data.byUser || {}
+    });
+    alert("Voting " + (open ? "opened" : "closed"));
+  };
+
+  window.setReveal = async function (reveal) {
+    const snap = await get(ref(db, "votes"));
+    const data = snap.val() || { open:false, reveal:false, totals:{}, byUser:{} };
+    await set(ref(db, "votes"), {
+      open: data.open,
+      reveal,
+      totals: data.totals || {},
+      byUser: data.byUser || {}
+    });
+    alert("Results " + (reveal ? "revealed" : "hidden"));
+  };
+
+  window.goHome = () => window.location.href = "home.html";
+
+  window.addEventListener("load", () => {
+    loadUsers();
+    loadCandidates();
+  });
+</script>
