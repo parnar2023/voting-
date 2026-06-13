@@ -60,12 +60,16 @@
 
 <h1>Admin Panel</h1>
 
+<!-- LOGIN -->
 <div id="loginSection">
   <input id="password" type="password" placeholder="Admin password">
   <button onclick="login()">Login</button>
 </div>
 
+<!-- ADMIN CONTENT -->
 <div id="adminSection">
+
+  <!-- Voting Controls -->
   <div class="card">
     <h2>Voting Controls</h2>
     <button onclick="openVoting()">Open Voting</button>
@@ -75,6 +79,7 @@
     <button onclick="resetVotes()">Reset Votes</button>
   </div>
 
+  <!-- Vote Summary -->
   <div class="card">
     <h2>Vote Summary</h2>
     <div id="summary"></div>
@@ -82,11 +87,13 @@
     <canvas id="pieChart" width="400" height="200"></canvas>
   </div>
 
+  <!-- Votes by User -->
   <div class="card">
     <h2>Votes by User</h2>
     <div id="votesByUser"></div>
   </div>
 
+  <!-- Candidates -->
   <div class="card">
     <h2>Candidates</h2>
     <input id="newCandidateName" placeholder="Candidate name">
@@ -94,12 +101,16 @@
     <div id="candidateList"></div>
   </div>
 
+  <!-- USERS -->
   <div class="card">
-    <h2>Users (jobs + hourly)</h2>
+    <h2>Users (Job + Daily Pay + Money)</h2>
+
     <input id="newUserCode" placeholder="User code">
     <input id="newUserName" placeholder="Name">
     <input id="newUserJob" placeholder="Job">
-    <input id="newUserRate" type="number" step="0.01" placeholder="Hourly rate">
+    <input id="newUserDailyPay" type="number" step="0.01" placeholder="Daily pay">
+    <input id="newUserMoney" type="number" step="0.01" placeholder="Starting money">
+
     <label>
       Admin?
       <select id="newUserIsAdmin">
@@ -107,9 +118,12 @@
         <option value="true">Yes</option>
       </select>
     </label>
-    <button onclick="addUser()">Add User</button>
+
+    <button onclick="addUser()">Add / Update User</button>
+
     <div id="userList"></div>
   </div>
+
 </div>
 
 <script type="module">
@@ -130,11 +144,12 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
-  const ADMIN_PASSWORD = "1234"; // change this
+  const ADMIN_PASSWORD = "1234"; // CHANGE THIS
 
   let barChart = null;
   let pieChart = null;
 
+  // LOGIN
   window.login = function () {
     const input = document.getElementById("password").value;
     if (input !== ADMIN_PASSWORD) {
@@ -146,6 +161,7 @@
     loadAll();
   }
 
+  // LOAD EVERYTHING
   function loadAll() {
     loadSummary();
     loadVotesByUser();
@@ -153,6 +169,7 @@
     loadUsers();
   }
 
+  // SUMMARY
   function loadSummary() {
     const totalsRef = ref(db, "votes/totals");
     const candRef = ref(db, "candidates");
@@ -172,14 +189,16 @@
         winner = winners.length === 1 ? winners[0] : "Tie";
       }
 
-      document.getElementById("summary").innerHTML = ids.length
-        ? `${names.map((n, i) => `${n}: ${values[i]}`).join(" | ")}<br><strong>Winner: ${winner}</strong>`
-        : "<em>No candidates yet.</em>";
+      document.getElementById("summary").innerHTML =
+        ids.length
+          ? `${names.map((n, i) => `${n}: ${values[i]}`).join(" | ")}<br><strong>Winner: ${winner}</strong>`
+          : "<em>No candidates yet.</em>";
 
       drawCharts(names, values);
     });
   }
 
+  // CHARTS
   function drawCharts(labels, values) {
     const colors = ["#594F4F", "#547980", "#45ADA8", "#9DE0AD", "#E5FCC2"];
 
@@ -220,33 +239,14 @@
     });
   }
 
-  window.openVoting = function () {
-    update(ref(db, "votes"), { open: true }).then(() => {
-      alert("Voting opened.");
-    });
-  }
-
-  window.closeVoting = function () {
-    update(ref(db, "votes"), { open: false }).then(() => {
-      alert("Voting closed.");
-    });
-  }
-
-  window.revealResults = function () {
-    update(ref(db, "votes"), { reveal: true }).then(() => {
-      alert("Results are now visible to voters.");
-    });
-  }
-
-  window.hideResults = function () {
-    update(ref(db, "votes"), { reveal: false }).then(() => {
-      alert("Results are now hidden from voters.");
-    });
-  }
+  // VOTING CONTROLS
+  window.openVoting = () => update(ref(db, "votes"), { open: true }).then(() => alert("Voting opened."));
+  window.closeVoting = () => update(ref(db, "votes"), { open: false }).then(() => alert("Voting closed."));
+  window.revealResults = () => update(ref(db, "votes"), { reveal: true }).then(() => alert("Results revealed."));
+  window.hideResults = () => update(ref(db, "votes"), { reveal: false }).then(() => alert("Results hidden."));
 
   window.resetVotes = function () {
     if (!confirm("Reset ALL votes?")) return;
-
     set(ref(db, "votes"), {
       totals: {},
       byUser: {},
@@ -259,11 +259,12 @@
     });
   }
 
+  // VOTES BY USER
   function loadVotesByUser() {
     const byUserRef = ref(db, "votes/byUser");
     get(byUserRef).then(snap => {
       const data = snap.val() || {};
-      let html = "<table><tr><th>User Code</th><th>Name</th><th>Candidate</th><th>Time</th></tr>";
+      let html = "<table><tr><th>User</th><th>Name</th><th>Candidate</th><th>Time</th></tr>";
       Object.keys(data).forEach(code => {
         const v = data[code];
         html += `<tr>
@@ -278,10 +279,10 @@
     });
   }
 
+  // CANDIDATES
   window.addCandidate = function () {
     const name = document.getElementById("newCandidateName").value.trim();
     if (!name) return;
-    const candRef = ref(db, "candidates");
     const id = name.replace(/\s+/g, "_") + "_" + Date.now();
     set(ref(db, "candidates/" + id), { name }).then(() => {
       document.getElementById("newCandidateName").value = "";
@@ -296,14 +297,13 @@
       const data = snap.val() || {};
       let html = "<table><tr><th>Name</th><th>Action</th></tr>";
       Object.keys(data).forEach(id => {
-        const c = data[id];
         html += `<tr>
-          <td>${c.name}</td>
+          <td>${data[id].name}</td>
           <td><button onclick="deleteCandidate('${id}')">Delete</button></td>
         </tr>`;
       });
       html += "</table>";
-      document.getElementById("candidateList").innerHTML = html || "<em>No candidates yet.</em>";
+      document.getElementById("candidateList").innerHTML = html;
     });
   }
 
@@ -315,30 +315,28 @@
     });
   }
 
+  // USERS
   window.addUser = function () {
     const code = document.getElementById("newUserCode").value.trim();
     const name = document.getElementById("newUserName").value.trim();
     const job = document.getElementById("newUserJob").value.trim();
-    const rate = parseFloat(document.getElementById("newUserRate").value || "0");
+    const dailyPay = parseFloat(document.getElementById("newUserDailyPay").value || "0");
+    const money = parseFloat(document.getElementById("newUserMoney").value || "0");
     const isAdmin = document.getElementById("newUserIsAdmin").value === "true";
 
     if (!code || !name) {
-      alert("User code and name are required.");
+      alert("User code and name required.");
       return;
     }
 
-    const userRef = ref(db, "users/" + code);
-    set(userRef, {
+    set(ref(db, "users/" + code), {
       name,
       job,
-      hourlyRate: rate,
+      dailyPay,
+      money,
       isAdmin
     }).then(() => {
-      alert("User added.");
-      document.getElementById("newUserCode").value = "";
-      document.getElementById("newUserName").value = "";
-      document.getElementById("newUserJob").value = "";
-      document.getElementById("newUserRate").value = "";
+      alert("User added/updated.");
       loadUsers();
     });
   }
@@ -347,14 +345,15 @@
     const usersRef = ref(db, "users");
     get(usersRef).then(snap => {
       const data = snap.val() || {};
-      let html = "<table><tr><th>Code</th><th>Name</th><th>Job</th><th>Hourly</th><th>Admin</th></tr>";
+      let html = "<table><tr><th>Code</th><th>Name</th><th>Job</th><th>Daily Pay</th><th>Money</th><th>Admin</th></tr>";
       Object.keys(data).forEach(code => {
         const u = data[code];
         html += `<tr>
           <td>${code}</td>
-          <td>${u.name || ""}</td>
-          <td>${u.job || ""}</td>
-          <td>${u.hourlyRate || 0}</td>
+          <td>${u.name}</td>
+          <td>${u.job}</td>
+          <td>${u.dailyPay}</td>
+          <td>${u.money}</td>
           <td>${u.isAdmin ? "Yes" : "No"}</td>
         </tr>`;
       });
@@ -362,6 +361,7 @@
       document.getElementById("userList").innerHTML = html;
     });
   }
+
 </script>
 
 </body>
