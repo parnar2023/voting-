@@ -20,6 +20,36 @@
     #sidebarAd { position:fixed; right:10px; top:80px; max-width:160px; }
     #sidebarAd img { max-width:160px; max-height:200px; border-radius:8px; }
     #chatPinAd img { max-width:100%; max-height:100px; border-radius:8px; display:block; margin:0 auto 10px auto; }
+
+    /* SUPER RARE ANIMATED CHAT EFFECTS */
+    .animated-rainbow {
+      background: linear-gradient(90deg, red, orange, yellow, green, blue, purple);
+      -webkit-background-clip: text;
+      color: transparent;
+      animation: rainbowMove 3s linear infinite;
+    }
+    @keyframes rainbowMove {
+      0% { background-position: 0%; }
+      100% { background-position: 200%; }
+    }
+
+    .animated-fire {
+      color: #ff4500;
+      animation: firePulse 1.2s infinite alternate;
+    }
+    @keyframes firePulse {
+      from { text-shadow: 0 0 5px #ff4500; }
+      to { text-shadow: 0 0 20px #ff0000; }
+    }
+
+    .animated-neon {
+      color: #39ff14;
+      animation: neonPulse 1s infinite alternate;
+    }
+    @keyframes neonPulse {
+      from { text-shadow: 0 0 5px #39ff14; }
+      to { text-shadow: 0 0 20px #39ff14; }
+    }
   </style>
 </head>
 <body>
@@ -145,22 +175,44 @@ function subscribeChat() {
     let html = "";
     Object.keys(data).forEach(id => {
       const m = data[id];
-      html += `<div><strong>${m.userName || m.userCode}:</strong> ${m.text}<br><small>${new Date(m.timestamp).toLocaleString()}</small></div><hr>`;
+      html += `
+        <div>
+          <strong class="${m.effectColor || ''}">${m.userName || m.userCode}:</strong>
+          ${m.text}
+          <br><small>${new Date(m.timestamp).toLocaleString()}</small>
+        </div><hr>`;
     });
     document.getElementById("chatMessages").innerHTML = html || "<em>No messages.</em>";
   });
 }
 
-window.sendMessage = function () {
+window.sendMessage = async function () {
   const text = document.getElementById("chatInput").value.trim();
   if (!text) return;
+
+  const userSnap = await get(ref(db, "users/" + userCode));
+  const user = userSnap.val();
+  const effect = user.equippedEffect || null;
+
+  let effectColor = "";
+  if (effect === "rainbowWave") effectColor = "animated-rainbow";
+  if (effect === "fireGlow") effectColor = "animated-fire";
+  if (effect === "neonPulse") effectColor = "animated-neon";
+  if (effect === "gold") effectColor = "gold";
+  if (effect === "blue") effectColor = "blue";
+  if (effect === "green") effectColor = "green";
+  if (effect === "grey") effectColor = "grey";
+
   const newRef = push(ref(db, "chat"));
-  set(newRef, {
+  await set(newRef, {
     text,
     userCode,
-    userName: userName || "",
+    userName,
+    effectColor,
     timestamp: Date.now()
-  }).then(() => document.getElementById("chatInput").value = "");
+  });
+
+  document.getElementById("chatInput").value = "";
 };
 
 async function loadLeaderboard() {
