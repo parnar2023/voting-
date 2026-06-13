@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shop</title>
+  <style>
+    body { font-family:Arial; background:#E5FCC2; color:#594F4F; padding:20px; }
+    .top-bar { display:flex; justify-content:space-between; align-items:center; background:#547980; color:#E5FCC2; padding:10px 15px; border-radius:8px; margin-bottom:20px; }
+    .balance { font-weight:bold; }
+    .btn { padding:6px 12px; border-radius:5px; border:none; cursor:pointer; background:#45ADA8; color:#594F4F; font-weight:bold; margin-left:4px; }
+    .btn:hover { background:#9DE0AD; }
+    .section { background:#F7FFF0; border-radius:8px; padding:15px; margin-bottom:20px; border:1px solid #9DE0AD; max-width:900px; margin:0 auto 20px auto; }
+    .slotBox { border:1px solid #9DE0AD; padding:10px; border-radius:8px; margin-bottom:15px; background:#FFFFFF; }
+    input[type=file] { margin-top:8px; }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <div>Logged in as: <strong id="who"></strong></div>
+    <div class="balance">Balance: <span id="balance">£0.00</span></div>
+    <div>
+      <button class="btn" onclick="goHome()">Home</button>
+      <button class="btn" onclick="goVoting()">Voting</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Buy Advertising Slots</h2>
+    <div id="slots"></div>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+import { 
+  getDatabase, ref, get, set, update 
+} from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+import {
+  getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
+  authDomain: "website-f6d0f.firebaseapp.com",
+  databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "website-f6d0f",
+  storageBucket: "website-f6d0f.appspot.com",
+  messagingSenderId: "800099865387",
+  appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
+  measurementId: "G-G8HTF5580X"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const storage = getStorage(app);
+
+const userCode = localStorage.getItem("userCode");
+const userName = localStorage.getItem("userName");
+if (!userCode) window.location.href = "index.html";
+
+async function loadUser() {
+  const snap = await get(ref(db, "users/" + userCode));
+  if (!snap.exists()) return;
+  const u = snap.val();
+  document.getElementById("who").innerText = u.name || userCode;
+  document.getElementById("balance").innerText = "£" + (u.money || 0).toFixed(2);
+}
+
+setInterval(async () => {
+  const snap = await get(ref(db, "users/" + userCode));
+  if (!snap.exists()) return;
+  const u = snap.val();
+  document.getElementById("balance").innerText = "£" + (u.money || 0).toFixed(2);
+}, 2000);
+
+const slotNames = {
+  homepage: "Homepage Banner",
+  sidebar: "Sidebar Banner",
+  chatPin: "Chat Pinned Banner",
+  voting: "Voting Page Banner"
+};
+
+async function loadSlots() {
+  const container = document.getElementById("slots");
+  container.innerHTML = "";
+
+  for (const slot in slotNames) {
+    const snap = await get(ref(db, "ads/" + slot));
+    const ad = snap.val();
+    let price = 1;
+    let owner = "Available";
+    let expires = "";
+    let expired = true;
+
+    if (ad && ad.expiresAt > Date.now()) {
+      price = 2;
+      owner = ad.owner;
+      expires = new Date(ad.expiresAt).toLocaleString();
+      expired = false;
+    }
+
+    const box = document.createElement("div");
+    box.className = "slotBox";
+
+    box.innerHTML = `
+      <h3>${slotNames[slot]}</h3>
+      <div><strong>Owner:</strong> ${owner}</div>
+      <div><strong>Price:</strong> £${price}</div>
+      ${expired ? "" : `<div><strong>Expires:</strong> ${expires}</div>`}
+      <input type="file" id="file_${slot}" accept="image/*">
+      <button class="btn" onclick="buySlot('${slot}')">Buy</button>
+    `;
+
+    container.appendChild(box);
+  }
+}
+
+window.buySlot = async function(slotName) {
+  const fileInput = document.getElementById("file_" + slotName);
+  const file = fileInput.files[0];
+
+  if (!file) {
+    alert("Please choose an image file.");
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    alert("Only image files are allowed.");
+    return;
+  }
+
+  const userSnap = await get(ref(db, "users/" + userCode));
+  const user = userSnap.val();
+  let money = user.money || 0;
+
+  const adSnap = await get(ref(db, "ads/" + slotName));
+  const ad = adSnap.val();
+
+  let price = 1;
+  let expired = true;
+
+  if (ad && ad.expiresAt > Date.now()) {
+    price = 2;
+    expired = false;
+  }
+
+  if (money < price) {
+    alert("Not enough money.");
+    return;
+  }
+
+  // Deduct money
+  await update(ref(db, "users/" + userCode), { money: money - price });
+
+  // Delete old image if needed
+  if (!expired && ad.storagePath) {
+    try { await deleteObject(sRef(storage, ad.storagePath)); } catch(e){}
+  }
+
+  // Upload new image
+  const path = `ads/${slotName}/${userCode}_${Date.now()}.png`;
+  const storageRef = sRef(storage, path);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+
+  // Write new ad data
+  await set(ref(db, "ads/" + slotName), {
+    imageUrl: url,
+    storagePath: path,
+    owner: userCode,
+    purchasedAt: Date.now(),
+    expiresAt: Date.now() + 86400000,
+    pricePaid: price
+  });
+
+  alert("Ad purchased successfully!");
+  loadSlots();
+};
+
+window.goHome = () => window.location.href = "home.html";
+window.goVoting = () => window.location.href = "voting.html";
+
+window.addEventListener("load", async () => {
+  await loadUser();
+  await loadSlots();
+});
+</script>
+
+</body>
+</html>
