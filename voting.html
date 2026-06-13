@@ -38,7 +38,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, get, set, update } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
@@ -66,7 +66,6 @@
       document.getElementById("balance").innerText = "£" + (u.money || 0).toFixed(2);
     }
 
-    // live money
     setInterval(async () => {
       const snap = await get(ref(db, "users/" + userCode));
       if (!snap.exists()) return;
@@ -137,7 +136,7 @@
       });
       alert("Vote recorded.");
       loadVoting();
-    }
+    };
 
     async function loadVotingAd() {
       const snap = await get(ref(db, "ads/voting"));
@@ -161,3 +160,4 @@
   </script>
 </body>
 </html>
+
