@@ -10,7 +10,7 @@
     .btn:hover { background:#9DE0AD; }
     .section { background:#F7FFF0; border-radius:8px; padding:15px; margin-bottom:20px; border:1px solid #9DE0AD; max-width:900px; margin:0 auto 20px auto; }
     .slotBox { border:1px solid #9DE0AD; padding:10px; border-radius:8px; margin-bottom:15px; background:#FFFFFF; }
-    input[type=file] { margin-top:8px; }
+    input[type=text] { width:100%; padding:6px; margin-top:8px; border-radius:5px; border:1px solid #9DE0AD; }
   </style>
 </head>
 <body>
@@ -34,9 +34,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase
 import { 
   getDatabase, ref, get, set, update 
 } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-import {
-  getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject
-} from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
@@ -51,7 +48,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-const storage = getStorage(app);
 
 const userCode = localStorage.getItem("userCode");
 const userName = localStorage.getItem("userName");
@@ -106,7 +102,7 @@ async function loadSlots() {
       <div><strong>Owner:</strong> ${owner}</div>
       <div><strong>Price:</strong> £${price}</div>
       ${expired ? "" : `<div><strong>Expires:</strong> ${expires}</div>`}
-      <input type="file" id="file_${slot}" accept="image/*">
+      <input type="text" id="url_${slot}" placeholder="Paste image URL (PNG/JPG/GIF)">
       <button class="btn" onclick="buySlot('${slot}')">Buy</button>
     `;
 
@@ -115,16 +111,16 @@ async function loadSlots() {
 }
 
 window.buySlot = async function(slotName) {
-  const fileInput = document.getElementById("file_" + slotName);
-  const file = fileInput.files[0];
+  const urlInput = document.getElementById("url_" + slotName);
+  const imageUrl = urlInput.value.trim();
 
-  if (!file) {
-    alert("Please choose an image file.");
+  if (!imageUrl) {
+    alert("Please paste an image URL.");
     return;
   }
 
-  if (!file.type.startsWith("image/")) {
-    alert("Only image files are allowed.");
+  if (!imageUrl.startsWith("http")) {
+    alert("Invalid URL.");
     return;
   }
 
@@ -151,21 +147,9 @@ window.buySlot = async function(slotName) {
   // Deduct money
   await update(ref(db, "users/" + userCode), { money: money - price });
 
-  // Delete old image if needed
-  if (!expired && ad.storagePath) {
-    try { await deleteObject(sRef(storage, ad.storagePath)); } catch(e){}
-  }
-
-  // Upload new image
-  const path = `ads/${slotName}/${userCode}_${Date.now()}.png`;
-  const storageRef = sRef(storage, path);
-  await uploadBytes(storageRef, file);
-  const url = await getDownloadURL(storageRef);
-
   // Write new ad data
   await set(ref(db, "ads/" + slotName), {
-    imageUrl: url,
-    storagePath: path,
+    imageUrl: imageUrl,
     owner: userCode,
     purchasedAt: Date.now(),
     expiresAt: Date.now() + 86400000,
