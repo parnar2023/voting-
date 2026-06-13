@@ -1,61 +1,107 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Vote</title>
+  <title>Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #594F4F, #547980);
+      color: #E5FCC2;
+      text-align: center;
+      padding-top: 80px;
+    }
+    .card {
+      background: rgba(0,0,0,0.2);
+      padding: 30px;
+      border-radius: 10px;
+      display: inline-block;
+      min-width: 280px;
+    }
+    input {
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 5px;
+      border: none;
+      width: 200px;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+      background: #45ADA8;
+      color: #594F4F;
+      font-weight: bold;
+    }
+    button:hover { background: #9DE0AD; }
+    #error { color: #E5FCC2; margin-top: 10px; }
+    a {
+      color: #E5FCC2;
+      text-decoration: underline;
+      display: block;
+      margin-top: 15px;
+    }
+  </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
-    <style>
-        body { font-family: Arial; text-align: center; padding-top: 50px; }
-        button { padding: 15px 30px; margin: 10px; font-size: 20px; cursor: pointer; }
-        #message { margin-top: 20px; font-size: 18px; }
-    </style>
+    const firebaseConfig = {
+      apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
+      authDomain: "website-f6d0f.firebaseapp.com",
+      databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "website-f6d0f",
+      storageBucket: "website-f6d0f.appspot.com",
+      messagingSenderId: "800099865387",
+      appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
+      measurementId: "G-G8HTF5580X"
+    };
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getDatabase, ref, runTransaction } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
-            authDomain: "website-f6d0f.firebaseapp.com",
-            databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "website-f6d0f",
-            storageBucket: "website-f6d0f.appspot.com",
-            messagingSenderId: "800099865387",
-            appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
-            measurementId: "G-G8HTF5580X"
-        };
+    window.login = function () {
+      const code = document.getElementById("code").value.trim();
+      const errorEl = document.getElementById("error");
+      errorEl.textContent = "";
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+      if (!code) {
+        errorEl.textContent = "Enter your user code.";
+        return;
+      }
 
-        window.vote = function(name) {
-            if (localStorage.getItem("voted") === "yes") {
-                alert("You already voted");
-                return;
-            }
+      const userRef = ref(db, "users/" + code);
 
-            const voteRef = ref(db, "votes/" + name);
-
-            runTransaction(voteRef, (count) => {
-                return (count || 0) + 1;
-            });
-
-            localStorage.setItem("voted", "yes");
-            document.getElementById("message").innerText = "Your vote has been recorded!";
+      get(userRef).then(snap => {
+        if (!snap.exists()) {
+          errorEl.textContent = "Invalid user code.";
+          return;
         }
-    </script>
+
+        const user = snap.val();
+
+        localStorage.setItem("userCode", code);
+        localStorage.setItem("userName", user.name || "");
+        localStorage.setItem("isAdmin", user.isAdmin ? "true" : "false");
+
+        window.location.href = "home.html";
+      });
+    }
+  </script>
 </head>
 <body>
 
-<h1>Vote for a Candidate</h1>
-<p>Your vote is anonymous.</p>
-
-<button onclick="vote('Max')">Max</button>
-<button onclick="vote('Ben')">Ben</button>
-<button onclick="vote('Dom')">Dom</button>
-
-<p id="message"></p>
+  <div class="card">
+    <h1>Login</h1>
+    <p>Enter your user code</p>
+    <input id="code" placeholder="User code"><br>
+    <button onclick="login()">Login</button>
+    <div id="error"></div>
+    <a href="admin.html">Admin login</a>
+  </div>
 
 </body>
 </html>
-
 
