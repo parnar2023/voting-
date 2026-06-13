@@ -60,226 +60,338 @@
     .rarity-epic { color: #9DE0AD; font-weight: bold; }
     .rarity-legendary { color: #E5FCC2; font-weight: bold; background:#594F4F; padding:2px 4px; border-radius:4px; }
     #message { margin-top: 10px; font-weight: bold; }
+
+    /* Popup */
+    #adPopup {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+    #adPopupContent {
+      background: #FFFFFF;
+      padding: 20px;
+      border-radius: 10px;
+      width: 350px;
+      color: #594F4F;
+    }
   </style>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, get, set, update } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
-      authDomain: "website-f6d0f.firebaseapp.com",
-      databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "website-f6d0f",
-      storageBucket: "website-f6d0f.appspot.com",
-      messagingSenderId: "800099865387",
-      appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
-      measurementId: "G-G8HTF5580X"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    const userCode = localStorage.getItem("userCode");
-    if (!userCode) {
-      window.location.href = "index.html";
-    }
-
-    let userData = null;
-    let itemsData = {};
-    let chestsData = {};
-
-    async function loadUser() {
-      const userRef = ref(db, "users/" + userCode);
-      const snap = await get(userRef);
-      if (!snap.exists()) return;
-      userData = snap.val();
-      document.getElementById("who").innerText = userData.name || userCode;
-      updateBalanceDisplay();
-    }
-
-    function updateBalanceDisplay() {
-      const money = userData?.money || 0;
-      document.getElementById("balance").innerText = "£" + (money.toFixed ? money.toFixed(2) : money);
-    }
-
-    async function loadItemsAndChests() {
-      const itemsSnap = await get(ref(db, "items"));
-      itemsData = itemsSnap.val() || {};
-      const chestsSnap = await get(ref(db, "chests"));
-      chestsData = chestsSnap.val() || {};
-      renderChests();
-      renderInventory();
-    }
-
-    function rarityClass(r) {
-      if (!r) return "";
-      r = r.toLowerCase();
-      if (r === "common") return "rarity-common";
-      if (r === "uncommon") return "rarity-uncommon";
-      if (r === "rare") return "rarity-rare";
-      if (r === "epic") return "rarity-epic";
-      if (r === "legendary") return "rarity-legendary";
-      return "";
-    }
-
-    function setMessage(msg) {
-      document.getElementById("message").innerText = msg;
-    }
-
-    function renderChests() {
-      const container = document.getElementById("chestList");
-      const keys = Object.keys(chestsData);
-      if (!keys.length) {
-        container.innerHTML = "<em>No chests configured.</em>";
-        return;
-      }
-      let html = "<table><tr><th>Name</th><th>Price</th><th>Action</th></tr>";
-      keys.forEach(id => {
-        const c = chestsData[id];
-        html += `<tr>
-          <td>${c.name || id}</td>
-          <td>£${(c.price || 0).toFixed ? c.price.toFixed(2) : c.price || 0}</td>
-          <td><button class="btn" onclick="buyChest('${id}')">Buy & Open</button></td>
-        </tr>`;
-      });
-      html += "</table>";
-      container.innerHTML = html;
-    }
-
-    function renderInventory() {
-      const container = document.getElementById("inventoryList");
-      const inv = (userData && userData.inventory) || {};
-      const ids = Object.keys(inv);
-      if (!ids.length) {
-        container.innerHTML = "<em>You have no items yet.</em>";
-        return;
-      }
-      let html = "<table><tr><th>Name</th><th>Rarity</th><th>Type</th><th>Sell for</th><th>Action</th></tr>";
-      ids.forEach(itemId => {
-        const item = itemsData[itemId];
-        if (!item) return;
-        const cls = rarityClass(item.rarity);
-        const sellValue = item.sellValue || 0;
-        html += `<tr>
-          <td class="${cls}">${item.name}</td>
-          <td>${item.rarity || ""}</td>
-          <td>${item.type || ""}</td>
-          <td>£${(sellValue.toFixed ? sellValue.toFixed(2) : sellValue)}</td>
-          <td><button class="btn" onclick="sellItem('${itemId}')">Sell</button></td>
-        </tr>`;
-      });
-      html += "</table>";
-      container.innerHTML = html;
-    }
-
-    async function buyChest(chestId) {
-      setMessage("");
-      const chest = chestsData[chestId];
-      if (!chest) {
-        setMessage("Chest not found.");
-        return;
-      }
-      const price = chest.price || 0;
-      const money = userData.money || 0;
-      if (money < price) {
-        setMessage("Not enough money to buy this chest.");
-        return;
-      }
-
-      // pick random item from drops
-      const drops = chest.drops || [];
-      if (!drops.length) {
-        setMessage("This chest has no items configured.");
-        return;
-      }
-      const randomIndex = Math.floor(Math.random() * drops.length);
-      const itemId = drops[randomIndex];
-      const item = itemsData[itemId];
-      if (!item) {
-        setMessage("Chest gave an invalid item.");
-        return;
-      }
-
-      // update user: subtract money, add item to inventory
-      const newMoney = money - price;
-      const inv = userData.inventory || {};
-      inv[itemId] = true;
-
-      await update(ref(db, "users/" + userCode), {
-        money: newMoney,
-        inventory: inv
-      });
-
-      userData.money = newMoney;
-      userData.inventory = inv;
-      updateBalanceDisplay();
-      renderInventory();
-      setMessage("You opened a chest and got: " + item.name + " (" + (item.rarity || "unknown") + ")");
-    }
-
-    async function sellItem(itemId) {
-      setMessage("");
-      const item = itemsData[itemId];
-      if (!item) {
-        setMessage("Item not found.");
-        return;
-      }
-      const sellValue = item.sellValue || 0;
-      const inv = userData.inventory || {};
-      if (!inv[itemId]) {
-        setMessage("You don't own this item.");
-        return;
-      }
-
-      delete inv[itemId];
-      const newMoney = (userData.money || 0) + sellValue;
-
-      await update(ref(db, "users/" + userCode), {
-        money: newMoney,
-        inventory: inv
-      });
-
-      userData.money = newMoney;
-      userData.inventory = inv;
-      updateBalanceDisplay();
-      renderInventory();
-      setMessage("Sold " + item.name + " for £" + (sellValue.toFixed ? sellValue.toFixed(2) : sellValue));
-    }
-
-    window.addEventListener("load", async () => {
-      await loadUser();
-      await loadItemsAndChests();
-    });
-
-    window.backHome = function () {
-      window.location.href = "home.html";
-    }
-  </script>
 </head>
 <body>
 
-  <div class="top-bar">
-    <div>Logged in as: <strong id="who"></strong></div>
-    <div class="balance">Balance: <span id="balance">£0.00</span></div>
-    <div>
-      <button class="btn" onclick="backHome()">Back to Home</button>
-    </div>
+<div class="top-bar">
+  <div>Logged in as: <strong id="who"></strong></div>
+  <div class="balance">Balance: <span id="balance">£0.00</span></div>
+  <div>
+    <button class="btn" onclick="backHome()">Back to Home</button>
   </div>
+</div>
 
-  <div class="section">
-    <h2>Chests</h2>
-    <div id="chestList"></div>
-  </div>
+<div class="section">
+  <h2>Chests</h2>
+  <div id="chestList"></div>
+</div>
 
-  <div class="section">
-    <h2>Your Inventory</h2>
-    <div id="inventoryList"></div>
-  </div>
+<div class="section">
+  <h2>Advertising Slots</h2>
+  <div id="adList"></div>
+</div>
 
-  <div class="section">
-    <h2>Messages</h2>
-    <div id="message"></div>
+<div class="section">
+  <h2>Your Inventory</h2>
+  <div id="inventoryList"></div>
+</div>
+
+<div class="section">
+  <h2>Messages</h2>
+  <div id="message"></div>
+</div>
+
+<!-- AD POPUP -->
+<div id="adPopup">
+  <div id="adPopupContent">
+    <h3>Buy Advertising Slot</h3>
+    <label>Choose Slot:</label>
+    <select id="adSlotSelect">
+      <option value="homepage">Homepage Banner</option>
+      <option value="sidebar">Sidebar Ad</option>
+      <option value="voting">Voting Promo</option>
+      <option value="chatPin">Chat Pin</option>
+    </select>
+
+    <p>Current Price: <strong id="adCurrentPrice">£1</strong></p>
+    <p>Next Price: <strong id="adNextPrice">£2</strong></p>
+
+    <label>Upload Image:</label>
+    <input type="file" id="adImageInput" accept="image/*">
+
+    <br><br>
+    <button class="btn" onclick="confirmAdPurchase()">Confirm</button>
+    <button class="btn" onclick="closeAdPopup()">Cancel</button>
   </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+  import { getDatabase, ref, get, set, update } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+  import { getStorage, ref as sRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
+    authDomain: "website-f6d0f.firebaseapp.com",
+    databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "website-f6d0f",
+    storageBucket: "website-f6d0f.appspot.com",
+    messagingSenderId: "800099865387",
+    appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
+    measurementId: "G-G8HTF5580X"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const storage = getStorage(app);
+
+  const userCode = localStorage.getItem("userCode");
+  const userName = localStorage.getItem("userName");
+
+  if (!userCode) window.location.href = "index.html";
+
+  let userData = null;
+  let itemsData = {};
+  let chestsData = {};
+  let adsData = {};
+
+  async function loadUser() {
+    const snap = await get(ref(db, "users/" + userCode));
+    if (!snap.exists()) return;
+    userData = snap.val();
+    document.getElementById("who").innerText = userData.name || userCode;
+    updateBalanceDisplay();
+  }
+
+  function updateBalanceDisplay() {
+    const money = userData?.money || 0;
+    document.getElementById("balance").innerText = "£" + money.toFixed(2);
+  }
+
+  // Live money updater
+  setInterval(async () => {
+    const snap = await get(ref(db, "users/" + userCode));
+    if (!snap.exists()) return;
+    userData = snap.val();
+    updateBalanceDisplay();
+  }, 2000);
+
+  async function loadItemsAndChests() {
+    itemsData = (await get(ref(db, "items"))).val() || {};
+    chestsData = (await get(ref(db, "chests"))).val() || {};
+    adsData = (await get(ref(db, "ads"))).val() || {};
+    renderChests();
+    renderInventory();
+    renderAds();
+  }
+
+  function rarityClass(r) {
+    if (!r) return "";
+    r = r.toLowerCase();
+    return "rarity-" + r;
+  }
+
+  function setMessage(msg) {
+    document.getElementById("message").innerText = msg;
+  }
+
+  function renderChests() {
+    const container = document.getElementById("chestList");
+    let html = "<table><tr><th>Name</th><th>Price</th><th>Action</th></tr>";
+    Object.keys(chestsData).forEach(id => {
+      const c = chestsData[id];
+      html += `<tr>
+        <td>${c.name}</td>
+        <td>£${c.price}</td>
+        <td><button class="btn" onclick="buyChest('${id}')">Buy & Open</button></td>
+      </tr>`;
+    });
+    html += "</table>";
+    container.innerHTML = html;
+  }
+
+  function renderInventory() {
+    const container = document.getElementById("inventoryList");
+    const inv = userData.inventory || {};
+    const ids = Object.keys(inv);
+    if (!ids.length) {
+      container.innerHTML = "<em>You have no items.</em>";
+      return;
+    }
+    let html = "<table><tr><th>Name</th><th>Rarity</th><th>Type</th><th>Sell</th><th>Action</th></tr>";
+    ids.forEach(itemId => {
+      const item = itemsData[itemId];
+      if (!item) return;
+      html += `<tr>
+        <td class="${rarityClass(item.rarity)}">${item.name}</td>
+        <td>${item.rarity}</td>
+        <td>${item.type}</td>
+        <td>£${item.sellValue}</td>
+        <td><button class="btn" onclick="sellItem('${itemId}')">Sell</button></td>
+      </tr>`;
+    });
+    html += "</table>";
+    container.innerHTML = html;
+  }
+
+  async function buyChest(chestId) {
+    const chest = chestsData[chestId];
+    if (!chest) return;
+
+    if (userData.money < chest.price) {
+      setMessage("Not enough money.");
+      return;
+    }
+
+    const drops = chest.drops;
+    const itemId = drops[Math.floor(Math.random() * drops.length)];
+    const item = itemsData[itemId];
+
+    const newMoney = userData.money - chest.price;
+    const inv = userData.inventory || {};
+    inv[itemId] = true;
+
+    await update(ref(db, "users/" + userCode), {
+      money: newMoney,
+      inventory: inv
+    });
+
+    userData.money = newMoney;
+    userData.inventory = inv;
+
+    updateBalanceDisplay();
+    renderInventory();
+    setMessage("You got: " + item.name);
+  }
+
+  async function sellItem(itemId) {
+    const item = itemsData[itemId];
+    if (!item) return;
+
+    const inv = userData.inventory || {};
+    delete inv[itemId];
+
+    const newMoney = userData.money + item.sellValue;
+
+    await update(ref(db, "users/" + userCode), {
+      money: newMoney,
+      inventory: inv
+    });
+
+    userData.money = newMoney;
+    userData.inventory = inv;
+
+    updateBalanceDisplay();
+    renderInventory();
+    setMessage("Sold " + item.name);
+  }
+
+  // -------------------------
+  // ADVERTISING SYSTEM
+  // -------------------------
+
+  function renderAds() {
+    const container = document.getElementById("adList");
+    let html = "<table><tr><th>Slot</th><th>Owner</th><th>Price</th><th>Expires</th><th>Action</th></tr>";
+
+    ["homepage", "sidebar", "voting", "chatPin"].forEach(slot => {
+      const ad = adsData[slot] || { currentPrice: 1 };
+      const owner = ad.owner || "None";
+      const expires = ad.expiresAt ? new Date(ad.expiresAt).toLocaleString() : "None";
+
+      html += `<tr>
+        <td>${slot}</td>
+        <td>${owner}</td>
+        <td>£${ad.currentPrice || 1}</td>
+        <td>${expires}</td>
+        <td><button class="btn" onclick="openAdPopup('${slot}')">Buy</button></td>
+      </tr>`;
+    });
+
+    html += "</table>";
+    container.innerHTML = html;
+  }
+
+  window.openAdPopup = function(slot) {
+    document.getElementById("adSlotSelect").value = slot;
+    const ad = adsData[slot] || { currentPrice: 1 };
+    document.getElementById("adCurrentPrice").innerText = "£" + ad.currentPrice;
+    document.getElementById("adNextPrice").innerText = "£" + (ad.currentPrice * 2);
+    document.getElementById("adPopup").style.display = "flex";
+  }
+
+  window.closeAdPopup = function() {
+    document.getElementById("adPopup").style.display = "none";
+  }
+
+  window.confirmAdPurchase = async function() {
+    const slot = document.getElementById("adSlotSelect").value;
+    const file = document.getElementById("adImageInput").files[0];
+
+    if (!file) {
+      setMessage("Upload an image.");
+      return;
+    }
+
+    const ad = adsData[slot] || { currentPrice: 1 };
+    const price = ad.currentPrice || 1;
+
+    if (userData.money < price) {
+      setMessage("Not enough money.");
+      return;
+    }
+
+    // Upload image
+    const path = `adImages/${slot}_${userCode}_${Date.now()}`;
+    const storageRef = sRef(storage, path);
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+
+    // Deduct money
+    const newMoney = userData.money - price;
+
+    // Save ad
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+
+    await update(ref(db, "ads/" + slot), {
+      owner: userCode,
+      imageUrl: url,
+      currentPrice: price * 2,
+      expiresAt
+    });
+
+    await update(ref(db, "users/" + userCode), {
+      money: newMoney
+    });
+
+    userData.money = newMoney;
+
+    updateBalanceDisplay();
+    setMessage("Ad purchased!");
+    closeAdPopup();
+
+    adsData = (await get(ref(db, "ads"))).val() || {};
+    renderAds();
+  }
+
+  window.backHome = function() {
+    window.location.href = "home.html";
+  }
+
+  window.addEventListener("load", async () => {
+    await loadUser();
+    await loadItemsAndChests();
+  });
+</script>
 
 </body>
 </html>
