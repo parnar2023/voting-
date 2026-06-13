@@ -29,6 +29,14 @@
     <div id="slots"></div>
   </div>
 
+  <div class="section">
+    <h2>Chests</h2>
+    <button class="btn" onclick="buyChest()">Buy Chest (£500)</button>
+    <button class="btn" onclick="openInventory()">My Effects</button>
+    <div id="chestResult"></div>
+    <div id="inventory"></div>
+  </div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
 import { 
@@ -114,15 +122,8 @@ window.buySlot = async function(slotName) {
   const urlInput = document.getElementById("url_" + slotName);
   const imageUrl = urlInput.value.trim();
 
-  if (!imageUrl) {
-    alert("Please paste an image URL.");
-    return;
-  }
-
-  if (!imageUrl.startsWith("http")) {
-    alert("Invalid URL.");
-    return;
-  }
+  if (!imageUrl) return alert("Please paste an image URL.");
+  if (!imageUrl.startsWith("http")) return alert("Invalid URL.");
 
   const userSnap = await get(ref(db, "users/" + userCode));
   const user = userSnap.val();
@@ -132,32 +133,137 @@ window.buySlot = async function(slotName) {
   const ad = adSnap.val();
 
   let price = 1;
-  let expired = true;
+  if (ad && ad.expiresAt > Date.now()) price = 2;
 
-  if (ad && ad.expiresAt > Date.now()) {
-    price = 2;
-    expired = false;
-  }
+  if (money < price) return alert("Not enough money.");
 
-  if (money < price) {
-    alert("Not enough money.");
-    return;
-  }
-
-  // Deduct money
   await update(ref(db, "users/" + userCode), { money: money - price });
 
-  // Write new ad data
   await set(ref(db, "ads/" + slotName), {
-    imageUrl: imageUrl,
+    imageUrl,
     owner: userCode,
     purchasedAt: Date.now(),
     expiresAt: Date.now() + 86400000,
     pricePaid: price
   });
 
-  alert("Ad purchased successfully!");
+  alert("Ad purchased!");
   loadSlots();
+};
+
+
+// -------------------------
+// CHEST SYSTEM
+// -------------------------
+window.buyChest = async function () {
+  const userRef = ref(db, "users/" + userCode);
+  const snap = await get(userRef);
+  const user = snap.val();
+
+  if (!user) return alert("User not found.");
+  if ((user.money || 0) < 500) return alert("Not enough money.");
+
+  await update(userRef, { money: user.money - 500 });
+
+  const rewards = [
+    { id: "rainbowWave", chance: 0.4 },
+    { id: "fireGlow", chance: 0.3 },
+    { id: "neonPulse", chance: 0.3 },
+    { id: "gold", chance: 4 },
+    { id: "blue", chance: 10 },
+    { id: "green", chance: 20 },
+    { id: "grey", chance: 65 }
+  ];
+
+  let roll = Math.random() * 100;
+  let cumulative = 0;
+  let reward = "grey";
+
+  for (const r of rewards) {
+    cumulative += r.chance;
+    if (roll <= cumulative) {
+      reward = r.id;
+      break;
+    }
+  }
+
+  await update(ref(db, "users/" + userCode + "/effects"), {
+    [reward]: true
+  });
+
+  document.getElementById("chestResult").innerHTML =
+    `<h3>You got: <strong>${reward.toUpperCase()}</strong>!</h3>`;
+};
+
+window.openInventory = async function () {
+  const snap = await get(ref(db, "users/" + userCode + "/effects"));
+  const effects = snap.val() || {};
+
+  let html = "<h3>Your Effects</h3>";
+
+  const names = {
+    rainbowWave: "Rainbow Wave (Animated)",
+    fireGlow: "Fire Glow (Animated)",
+    neonPulse: "Neon Pulse (Animated)",
+    gold: "Gold Chat",
+    blue: "Blue Chat",
+    green: "Green Chat",
+    grey: "Grey Chat"
+  };
+
+  const sellPrices = {
+    rainbowWave: 400,
+    fireGlow: 350,
+    neonPulse: 350,
+    gold: 200,
+    blue: 100,
+    green: 50,
+    grey: 20
+  };
+
+  Object.keys(effects).forEach(id => {
+    html += `
+      <div style="margin-bottom:10px;">
+        <strong>${names[id]}</strong>
+        <button class="btn" onclick="equipEffect('${id}')">Equip</button>
+        <button class="btn" onclick="sellEffect('${id}', ${sellPrices[id]})">Sell (£${sellPrices[id]})</button>
+      </div>
+    `;
+  });
+
+  if (Object.keys(effects).length === 0) {
+    html += "<em>You have no effects.</em>";
+  }
+
+  document.getElementById("inventory").innerHTML = html;
+};
+
+window.equipEffect = async function (effectId) {
+  await update(ref(db, "users/" + userCode), {
+    equippedEffect: effectId
+  });
+
+  alert("Equipped: " + effectId.toUpperCase());
+};
+
+window.sellEffect = async function (effectId, price) {
+  const userRef = ref(db, "users/" + userCode);
+  const snap = await get(userRef);
+  const user = snap.val();
+
+  if (!user.effects || !user.effects[effectId])
+    return alert("You don't own this effect.");
+
+  await update(ref(db, "users/" + userCode + "/effects"), {
+    [effectId]: null
+  });
+
+  await update(userRef, {
+    money: (user.money || 0) + price
+  });
+
+  alert("Sold for £" + price);
+  openInventory();
 };
 
 window.goHome = () => window.location.href = "home.html";
