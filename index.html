@@ -3,47 +3,19 @@
 <head>
   <title>Login</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #594F4F, #547980);
-      color: #E5FCC2;
-      text-align: center;
-      padding-top: 80px;
-    }
-    .card {
-      background: rgba(0,0,0,0.2);
-      padding: 30px;
-      border-radius: 10px;
-      display: inline-block;
-      min-width: 280px;
-    }
-    input {
-      padding: 10px;
-      font-size: 16px;
-      border-radius: 5px;
-      border: none;
-      width: 200px;
-      margin-bottom: 10px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      border-radius: 5px;
-      border: none;
-      cursor: pointer;
-      background: #45ADA8;
-      color: #594F4F;
-      font-weight: bold;
-    }
-    button:hover { background: #9DE0AD; }
-    #error { color: #E5FCC2; margin-top: 10px; }
-    a {
-      color: #E5FCC2;
-      text-decoration: underline;
-      display: block;
-      margin-top: 15px;
-    }
+    body { font-family: Arial; background:#E5FCC2; color:#594F4F; text-align:center; padding:40px; }
+    select, button { padding:8px; margin:6px; border-radius:5px; border:1px solid #9DE0AD; }
+    button { background:#45ADA8; color:#594F4F; font-weight:bold; cursor:pointer; }
+    button:hover { background:#9DE0AD; }
   </style>
+</head>
+<body>
+  <h1>Login</h1>
+  <p>Select your user:</p>
+  <select id="userSelect"></select><br>
+  <button onclick="login()">Continue</button>
+  <button onclick="goAdmin()">Admin</button>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
@@ -62,46 +34,37 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    window.login = function () {
-      const code = document.getElementById("code").value.trim();
-      const errorEl = document.getElementById("error");
-      errorEl.textContent = "";
-
-      if (!code) {
-        errorEl.textContent = "Enter your user code.";
-        return;
-      }
-
-      const userRef = ref(db, "users/" + code);
-
-      get(userRef).then(snap => {
-        if (!snap.exists()) {
-          errorEl.textContent = "Invalid user code.";
-          return;
-        }
-
-        const user = snap.val();
-
-        localStorage.setItem("userCode", code);
-        localStorage.setItem("userName", user.name || "");
-        localStorage.setItem("isAdmin", user.isAdmin ? "true" : "false");
-
-        window.location.href = "home.html";
+    async function loadUsers() {
+      const snap = await get(ref(db, "users"));
+      const data = snap.val() || {};
+      const sel = document.getElementById("userSelect");
+      sel.innerHTML = "";
+      Object.keys(data).forEach(code => {
+        const u = data[code];
+        const opt = document.createElement("option");
+        opt.value = code;
+        opt.textContent = `${u.name || code} (${code})`;
+        sel.appendChild(opt);
       });
     }
+
+    window.login = async function () {
+      const code = document.getElementById("userSelect").value;
+      if (!code) return;
+      const snap = await get(ref(db, "users/" + code));
+      if (!snap.exists()) return;
+      const u = snap.val();
+      localStorage.setItem("userCode", code);
+      localStorage.setItem("userName", u.name || "");
+      localStorage.setItem("isAdmin", u.isAdmin ? "true" : "false");
+      window.location.href = "home.html";
+    }
+
+    window.goAdmin = function () {
+      window.location.href = "admin.html";
+    }
+
+    window.addEventListener("load", loadUsers);
   </script>
-</head>
-<body>
-
-  <div class="card">
-    <h1>Login</h1>
-    <p>Enter your user code</p>
-    <input id="code" placeholder="User code"><br>
-    <button onclick="login()">Login</button>
-    <div id="error"></div>
-    <a href="admin.html">Admin login</a>
-  </div>
-
 </body>
 </html>
-
