@@ -23,6 +23,7 @@
   </style>
 </head>
 <body>
+
   <div class="top-bar">
     <div>Logged in as: <strong id="who"></strong></div>
     <div class="balance">Balance: <span id="balance">£0.00</span></div>
@@ -59,173 +60,177 @@
     <div id="leaderboard"></div>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, onValue, push, set, get, update } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+import { 
+  getDatabase, ref, onValue, push, set, get, update 
+} from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+import {
+  getStorage, ref as sRef, deleteObject
+} from "https://www.gstatic.com/firebasejs/9.6.1/firebase-storage.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
-      authDomain: "website-f6d0f.firebaseapp.com",
-      databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "website-f6d0f",
-      storageBucket: "website-f6d0f.appspot.com",
-      messagingSenderId: "800099865387",
-      appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
-      measurementId: "G-G8HTF5580X"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
+  authDomain: "website-f6d0f.firebaseapp.com",
+  databaseURL: "https://website-f6d0f-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "website-f6d0f",
+  storageBucket: "website-f6d0f.appspot.com",
+  messagingSenderId: "800099865387",
+  appId: "1:800099865387:web:8430a2c3bddb071d236b6e",
+  measurementId: "G-G8HTF5580X"
+};
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const storage = getStorage(app);
 
-    const userCode = localStorage.getItem("userCode");
-    const userName = localStorage.getItem("userName");
-    const isAdmin = localStorage.getItem("isAdmin") === "true";
+const userCode = localStorage.getItem("userCode");
+const userName = localStorage.getItem("userName");
+const isAdmin = localStorage.getItem("isAdmin") === "true";
 
-    if (!userCode) window.location.href = "index.html";
+if (!userCode) window.location.href = "index.html";
 
-    function todayString() {
-      const d = new Date();
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-    }
+function todayString() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
 
-    async function applyDailyIncome() {
-      const userRef = ref(db, "users/" + userCode);
-      const snap = await get(userRef);
-      if (!snap.exists()) return;
-      const user = snap.val();
-      const lastPaid = user.lastPaidDate || "";
-      const today = todayString();
-      let money = user.money || 0;
-      const dailyPay = user.dailyPay || 0;
-      if (lastPaid !== today) {
-        money += dailyPay;
-        await update(userRef, { money, lastPaidDate: today });
-      }
-      document.getElementById("who").innerText = user.name || userCode;
-      document.getElementById("balance").innerText = "£" + money.toFixed(2);
-    }
+async function applyDailyIncome() {
+  const userRef = ref(db, "users/" + userCode);
+  const snap = await get(userRef);
+  if (!snap.exists()) return;
+  const user = snap.val();
+  const lastPaid = user.lastPaidDate || "";
+  const today = todayString();
+  let money = user.money || 0;
+  const dailyPay = user.dailyPay || 0;
+  if (lastPaid !== today) {
+    money += dailyPay;
+    await update(userRef, { money, lastPaidDate: today });
+  }
+  document.getElementById("who").innerText = user.name || userCode;
+  document.getElementById("balance").innerText = "£" + money.toFixed(2);
+}
 
-    setInterval(async () => {
-      const snap = await get(ref(db, "users/" + userCode));
-      if (!snap.exists()) return;
-      const u = snap.val();
-      const money = u.money || 0;
-      document.getElementById("balance").innerText = "£" + money.toFixed(2);
-    }, 2000);
+setInterval(async () => {
+  const snap = await get(ref(db, "users/" + userCode));
+  if (!snap.exists()) return;
+  const u = snap.val();
+  document.getElementById("balance").innerText = "£" + (u.money || 0).toFixed(2);
+}, 2000);
 
-    function loadAnnouncements() {
-      onValue(ref(db, "announcements"), snap => {
-        const data = snap.val() || {};
-        let html = "";
-        Object.keys(data).forEach(id => {
-          const a = data[id];
-          html += `<div><strong>${a.text}</strong><br><small>By ${a.createdByName || a.createdBy} at ${new Date(a.createdAt).toLocaleString()}</small></div><hr>`;
-        });
-        document.getElementById("announcements").innerHTML = html || "<em>No announcements.</em>";
-      });
-    }
-
-    window.addAnnouncement = function () {
-      const text = document.getElementById("announcementText").value.trim();
-      if (!text) return;
-      const newRef = push(ref(db, "announcements"));
-      set(newRef, {
-        text,
-        createdBy: userCode,
-        createdByName: userName || "",
-        createdAt: Date.now()
-      }).then(() => document.getElementById("announcementText").value = "");
-    };
-
-    function subscribeChat() {
-      onValue(ref(db, "chat"), snap => {
-        const data = snap.val() || {};
-        let html = "";
-        Object.keys(data).forEach(id => {
-          const m = data[id];
-          html += `<div><strong>${m.userName || m.userCode}:</strong> ${m.text}<br><small>${new Date(m.timestamp).toLocaleString()}</small></div><hr>`;
-        });
-        document.getElementById("chatMessages").innerHTML = html || "<em>No messages.</em>";
-      });
-    }
-
-    window.sendMessage = function () {
-      const text = document.getElementById("chatInput").value.trim();
-      if (!text) return;
-      const newRef = push(ref(db, "chat"));
-      set(newRef, {
-        text,
-        userCode,
-        userName: userName || "",
-        timestamp: Date.now()
-      }).then(() => document.getElementById("chatInput").value = "");
-    };
-
-    async function loadLeaderboard() {
-      const snap = await get(ref(db, "users"));
-      const data = snap.val() || {};
-      const arr = Object.keys(data).map(code => ({
-        code,
-        name: data[code].name || code,
-        job: data[code].job || "",
-        money: data[code].money || 0
-      }));
-      arr.sort((a,b) => b.money - a.money);
-      const top10 = arr.slice(0,10);
-      let html = "<table><tr><th>Rank</th><th>Name</th><th>Job</th><th>Money</th></tr>";
-      top10.forEach((u,i) => {
-        html += `<tr><td>${i+1}</td><td>${u.name}</td><td>${u.job}</td><td>£${u.money.toFixed(2)}</td></tr>`;
-      });
-      html += "</table>";
-      document.getElementById("leaderboard").innerHTML = top10.length ? html : "<em>No users.</em>";
-    }
-
-    async function loadAds() {
-      const [homeSnap, sideSnap, chatSnap] = await Promise.all([
-        get(ref(db, "ads/homepage")),
-        get(ref(db, "ads/sidebar")),
-        get(ref(db, "ads/chatPin"))
-      ]);
-
-      const homeAd = homeSnap.val();
-      const sideAd = sideSnap.val();
-      const chatAd = chatSnap.val();
-
-      const homeDiv = document.getElementById("homeAd");
-      const sideDiv = document.getElementById("sidebarAd");
-      const chatDiv = document.getElementById("chatPinAd");
-
-      if (homeAd && homeAd.imageUrl && homeAd.expiresAt > Date.now()) {
-        homeDiv.innerHTML = `<img src="${homeAd.imageUrl}" alt="Ad">`;
-      } else {
-        homeDiv.innerHTML = "";
-      }
-
-      if (sideAd && sideAd.imageUrl && sideAd.expiresAt > Date.now()) {
-        sideDiv.innerHTML = `<img src="${sideAd.imageUrl}" alt="Ad">`;
-      } else {
-        sideDiv.innerHTML = "";
-      }
-
-      if (chatAd && chatAd.imageUrl && chatAd.expiresAt > Date.now()) {
-        chatDiv.innerHTML = `<img src="${chatAd.imageUrl}" alt="Ad">`;
-      } else {
-        chatDiv.innerHTML = "";
-      }
-    }
-
-    window.goToVoting = () => window.location.href = "voting.html";
-    window.goToShop = () => window.location.href = "shop.html";
-    window.logout = () => { localStorage.clear(); window.location.href = "index.html"; };
-
-    window.addEventListener("load", async () => {
-      await applyDailyIncome();
-      if (!isAdmin) document.getElementById("adminAnnouncementForm").style.display = "none";
-      loadAnnouncements();
-      subscribeChat();
-      loadLeaderboard();
-      loadAds();
+function loadAnnouncements() {
+  onValue(ref(db, "announcements"), snap => {
+    const data = snap.val() || {};
+    let html = "";
+    Object.keys(data).forEach(id => {
+      const a = data[id];
+      html += `<div><strong>${a.text}</strong><br><small>By ${a.createdByName || a.createdBy} at ${new Date(a.createdAt).toLocaleString()}</small></div><hr>`;
     });
-  </script>
+    document.getElementById("announcements").innerHTML = html || "<em>No announcements.</em>";
+  });
+}
+
+window.addAnnouncement = function () {
+  const text = document.getElementById("announcementText").value.trim();
+  if (!text) return;
+  const newRef = push(ref(db, "announcements"));
+  set(newRef, {
+    text,
+    createdBy: userCode,
+    createdByName: userName || "",
+    createdAt: Date.now()
+  }).then(() => document.getElementById("announcementText").value = "");
+};
+
+function subscribeChat() {
+  onValue(ref(db, "chat"), snap => {
+    const data = snap.val() || {};
+    let html = "";
+    Object.keys(data).forEach(id => {
+      const m = data[id];
+      html += `<div><strong>${m.userName || m.userCode}:</strong> ${m.text}<br><small>${new Date(m.timestamp).toLocaleString()}</small></div><hr>`;
+    });
+    document.getElementById("chatMessages").innerHTML = html || "<em>No messages.</em>";
+  });
+}
+
+window.sendMessage = function () {
+  const text = document.getElementById("chatInput").value.trim();
+  if (!text) return;
+  const newRef = push(ref(db, "chat"));
+  set(newRef, {
+    text,
+    userCode,
+    userName: userName || "",
+    timestamp: Date.now()
+  }).then(() => document.getElementById("chatInput").value = "");
+};
+
+async function loadLeaderboard() {
+  const snap = await get(ref(db, "users"));
+  const data = snap.val() || {};
+  const arr = Object.keys(data).map(code => ({
+    code,
+    name: data[code].name || code,
+    job: data[code].job || "",
+    money: data[code].money || 0
+  }));
+  arr.sort((a,b) => b.money - a.money);
+  const top10 = arr.slice(0,10);
+  let html = "<table><tr><th>Rank</th><th>Name</th><th>Job</th><th>Money</th></tr>";
+  top10.forEach((u,i) => {
+    html += `<tr><td>${i+1}</td><td>${u.name}</td><td>${u.job}</td><td>£${u.money.toFixed(2)}</td></tr>`;
+  });
+  html += "</table>";
+  document.getElementById("leaderboard").innerHTML = top10.length ? html : "<em>No users.</em>";
+}
+
+async function loadAds() {
+  const slots = ["homepage", "sidebar", "chatPin"];
+  const elements = {
+    homepage: document.getElementById("homeAd"),
+    sidebar: document.getElementById("sidebarAd"),
+    chatPin: document.getElementById("chatPinAd")
+  };
+
+  for (const slot of slots) {
+    const snap = await get(ref(db, "ads/" + slot));
+    const ad = snap.val();
+    const div = elements[slot];
+
+    if (!ad) {
+      div.innerHTML = "";
+      continue;
+    }
+
+    if (ad.expiresAt < Date.now()) {
+      // Delete expired ad
+      if (ad.storagePath) {
+        try { await deleteObject(sRef(storage, ad.storagePath)); } catch(e){}
+      }
+      await set(ref(db, "ads/" + slot), null);
+      div.innerHTML = "";
+      continue;
+    }
+
+    div.innerHTML = `<img src="${ad.imageUrl}" alt="Ad">`;
+  }
+}
+
+window.goToVoting = () => window.location.href = "voting.html";
+window.goToShop = () => window.location.href = "shop.html";
+window.logout = () => { localStorage.clear(); window.location.href = "index.html"; };
+
+window.addEventListener("load", async () => {
+  await applyDailyIncome();
+  if (!isAdmin) document.getElementById("adminAnnouncementForm").style.display = "none";
+  loadAnnouncements();
+  subscribeChat();
+  loadLeaderboard();
+  loadAds();
+});
+</script>
+
 </body>
 </html>
