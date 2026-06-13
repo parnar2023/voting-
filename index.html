@@ -14,7 +14,6 @@
   <p>Select your user:</p>
   <select id="userSelect"></select><br>
   <button onclick="login()">Continue</button>
-  <button onclick="goAdmin()">Admin</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
@@ -58,11 +57,7 @@
       localStorage.setItem("userName", u.name || "");
       localStorage.setItem("isAdmin", u.isAdmin ? "true" : "false");
       window.location.href = "home.html";
-    }
-
-    window.goAdmin = function () {
-      window.location.href = "admin.html";
-    }
+    };
 
     window.addEventListener("load", loadUsers);
   </script>
