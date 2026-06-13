@@ -20,6 +20,9 @@
       border-radius: 8px;
       margin-bottom: 20px;
     }
+    .balance {
+      font-weight: bold;
+    }
     .btn {
       padding: 6px 12px;
       border-radius: 5px;
@@ -28,6 +31,7 @@
       background: #45ADA8;
       color: #594F4F;
       font-weight: bold;
+      margin-left: 4px;
     }
     .btn:hover { background: #9DE0AD; }
     .section {
@@ -36,7 +40,7 @@
       padding: 15px;
       margin-bottom: 20px;
       border: 1px solid #9DE0AD;
-      max-width: 800px;
+      max-width: 900px;
       margin-left: auto;
       margin-right: auto;
     }
@@ -57,10 +61,22 @@
       background: #FFFFFF;
     }
     small { color: #547980; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+      background: #FFFFFF;
+      color: #594F4F;
+    }
+    th, td {
+      border: 1px solid #9DE0AD;
+      padding: 6px;
+      text-align: left;
+    }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, onValue, push, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getDatabase, ref, onValue, push, set, get, update } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA0T3pnUvMgrNjmbYbTnetaxjtWCb55Y7Y",
@@ -84,13 +100,47 @@
       window.location.href = "index.html";
     }
 
-    window.addEventListener("load", () => {
-      document.getElementById("who").innerText = userName || userCode;
-      if (!isAdmin) {
-        document.getElementById("adminAnnouncementForm").style.display = "none";
+    function todayString() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    async function applyDailyIncome() {
+      const userRef = ref(db, "users/" + userCode);
+      const snap = await get(userRef);
+      if (!snap.exists()) return;
+      const user = snap.val();
+
+      const lastPaid = user.lastPaidDate || "";
+      const today = todayString();
+      let money = user.money || 0;
+      const dailyPay = user.dailyPay || 0;
+
+      if (lastPaid !== today) {
+        money += dailyPay;
+        await update(userRef, {
+          money,
+          lastPaidDate: today
+        });
       }
-      loadAnnouncements();
-      subscribeChat();
+
+      document.getElementById("who").innerText = user.name || userCode;
+      document.getElementById("balance").innerText =
+        "£" + (money.toFixed ? money.toFixed(2) : money);
+    }
+
+    window.addEventListener("load", () => {
+      applyDailyIncome().then(() => {
+        if (!isAdmin) {
+          document.getElementById("adminAnnouncementForm").style.display = "none";
+        }
+        loadAnnouncements();
+        subscribeChat();
+        loadLeaderboard();
+      });
     });
 
     // Announcements
@@ -106,7 +156,8 @@
             <small>By ${a.createdByName || a.createdBy} at ${new Date(a.createdAt).toLocaleString()}</small>
           </div><hr>`;
         });
-        document.getElementById("announcements").innerHTML = html || "<em>No announcements yet.</em>";
+        document.getElementById("announcements").innerHTML =
+          html || "<em>No announcements yet.</em>";
       });
     }
 
@@ -138,7 +189,8 @@
             <br><small>${new Date(m.timestamp).toLocaleString()}</small>
           </div><hr>`;
         });
-        document.getElementById("chatMessages").innerHTML = html || "<em>No messages yet.</em>";
+        document.getElementById("chatMessages").innerHTML =
+          html || "<em>No messages yet.</em>";
       });
     }
 
@@ -157,8 +209,46 @@
       });
     }
 
+    // Leaderboard (top 10 by money)
+    async function loadLeaderboard() {
+      const usersRef = ref(db, "users");
+      const snap = await get(usersRef);
+      const data = snap.val() || {};
+      const arr = Object.keys(data).map(code => {
+        const u = data[code];
+        return {
+          code,
+          name: u.name || code,
+          job: u.job || "",
+          money: u.money || 0
+        };
+      });
+
+      arr.sort((a, b) => (b.money || 0) - (a.money || 0));
+      const top10 = arr.slice(0, 10);
+
+      let html = "<table><tr><th>Rank</th><th>Name</th><th>Job</th><th>Money</th></tr>";
+      top10.forEach((u, i) => {
+        html += `<tr>
+          <td>${i + 1}</td>
+          <td>${u.name}</td>
+          <td>${u.job}</td>
+          <td>£${(u.money.toFixed ? u.money.toFixed(2) : u.money)}</td>
+        </tr>`;
+      });
+      html += "</table>";
+
+      document.getElementById("leaderboard").innerHTML =
+        top10.length ? html : "<em>No users yet.</em>";
+    }
+
+    // Navigation
     window.goToVoting = function () {
       window.location.href = "voting.html";
+    }
+
+    window.goToShop = function () {
+      window.location.href = "shop.html";
     }
 
     window.logout = function () {
@@ -170,9 +260,15 @@
 <body>
 
   <div class="top-bar">
-    <div>Logged in as: <strong id="who"></strong></div>
+    <div>
+      Logged in as: <strong id="who"></strong>
+    </div>
+    <div class="balance">
+      Balance: <span id="balance">£0.00</span>
+    </div>
     <div>
       <button class="btn" onclick="goToVoting()">Go to Voting</button>
+      <button class="btn" onclick="goToShop()">Shop & Inventory</button>
       <button class="btn" onclick="logout()">Logout</button>
     </div>
   </div>
@@ -193,6 +289,11 @@
     <div id="chatMessages"></div>
     <textarea id="chatInput" placeholder="Type a message"></textarea><br>
     <button class="btn" onclick="sendMessage()">Send</button>
+  </div>
+
+  <div class="section">
+    <h2>Top 10 Richest Users</h2>
+    <div id="leaderboard"></div>
   </div>
 
 </body>
