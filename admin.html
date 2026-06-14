@@ -29,7 +29,7 @@
     button:hover { background: #9DE0AD; }
 
     .top-bar {
-      display: none; /* hidden until logged in */
+      display: none;
       justify-content: space-between;
       align-items: center;
       background: #547980;
@@ -50,7 +50,7 @@
     }
     .btn:hover { background: #9DE0AD; }
     .section {
-      display: none; /* hidden until logged in */
+      display: none;
       background: #F7FFF0;
       border-radius: 8px;
       padding: 15px;
@@ -114,6 +114,28 @@
     <button class="btn" onclick="setReveal(false)">Hide Results</button>
   </div>
 
+  <!-- ⭐ NEW SECTION: CHANGE MESSAGE COLOR -->
+  <div class="section" id="messageColorSection">
+    <h2>Change Message Color</h2>
+
+    <label>Select Message:</label>
+    <select id="messageSelect"></select>
+
+    <label>Select Color:</label>
+    <select id="messageColorSelect">
+      <option value="gold">Gold</option>
+      <option value="blue">Blue</option>
+      <option value="green">Green</option>
+      <option value="grey">Grey</option>
+      <option value="animated-rainbow">Rainbow Wave</option>
+      <option value="animated-fire">Fire Glow</option>
+      <option value="animated-neon">Neon Pulse</option>
+    </select>
+
+    <button class="btn" onclick="applyMessageColor()">Apply Color</button>
+    <p id="msgColorStatus" style="font-weight:bold;"></p>
+  </div>
+
 </div>
 
 <script type="module">
@@ -134,11 +156,7 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
-  // -------------------------
-  // SEPARATE ADMIN LOGIN
-  // -------------------------
-
-  const ADMIN_PASSWORD = "admin123"; // ← CHANGE THIS
+  const ADMIN_PASSWORD = "admin123";
 
   window.adminLogin = function () {
     const pass = document.getElementById("adminPass").value;
@@ -147,25 +165,21 @@
     if (pass === ADMIN_PASSWORD) {
       msg.innerText = "Access granted.";
 
-      // Hide login
       document.getElementById("adminLogin").style.display = "none";
 
-      // Show admin panel
       document.getElementById("adminTopBar").style.display = "flex";
       document.getElementById("userSection").style.display = "block";
       document.getElementById("candidateSection").style.display = "block";
       document.getElementById("votingSection").style.display = "block";
+      document.getElementById("messageColorSection").style.display = "block";
 
       loadUsers();
       loadCandidates();
+      loadChatMessages();
     } else {
       msg.innerText = "Incorrect password.";
     }
   };
-
-  // -------------------------
-  // USERS
-  // -------------------------
 
   async function loadUsers() {
     const snap = await get(ref(db, "users"));
@@ -214,10 +228,6 @@
     loadUsers();
   };
 
-  // -------------------------
-  // CANDIDATES
-  // -------------------------
-
   async function loadCandidates() {
     const snap = await get(ref(db, "candidates"));
     const data = snap.val() || {};
@@ -256,10 +266,6 @@
     loadCandidates();
   };
 
-  // -------------------------
-  // VOTING CONTROLS
-  // -------------------------
-
   window.setVoting = async function (open) {
     const snap = await get(ref(db, "votes"));
     const data = snap.val() || { open:false, reveal:false, totals:{}, byUser:{} };
@@ -288,9 +294,40 @@
     alert("Results " + (reveal ? "revealed" : "hidden"));
   };
 
-  // -------------------------
-  // NAVIGATION
-  // -------------------------
+  // ⭐ LOAD CHAT MESSAGES FOR COLOR EDITING
+  async function loadChatMessages() {
+    const snap = await get(ref(db, "chat"));
+    const data = snap.val() || {};
+
+    const select = document.getElementById("messageSelect");
+    select.innerHTML = "";
+
+    Object.keys(data).forEach(id => {
+      const m = data[id];
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = `${m.userName || m.userCode}: ${m.text.substring(0, 30)}...`;
+      select.appendChild(opt);
+    });
+  }
+
+  // ⭐ APPLY COLOR TO A SPECIFIC MESSAGE
+  window.applyMessageColor = async function () {
+    const msgId = document.getElementById("messageSelect").value;
+    const color = document.getElementById("messageColorSelect").value;
+    const status = document.getElementById("msgColorStatus");
+
+    if (!msgId || !color) {
+      status.innerText = "Select a message and color.";
+      return;
+    }
+
+    await update(ref(db, "chat/" + msgId), {
+      effectColor: color
+    });
+
+    status.innerText = "Message color updated!";
+  };
 
   window.goHome = function () {
     window.location.href = "home.html";
